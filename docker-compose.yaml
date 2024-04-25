@@ -15,8 +15,11 @@ services:
     volumes:
       - influxdb-data:/var/lib/influxdb2
 
-  backend:
-    image: backend
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: api
     ports:
       - "3000:3000"
     depends_on:
