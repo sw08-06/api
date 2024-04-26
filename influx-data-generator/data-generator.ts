@@ -12,5 +12,5 @@ export async function addData(client: InfluxDB, org: string, bucket: string) {
       .floatField('value', 35),
   ]
 
-  await writeApi.writePoints(dataPoints)
+  writeApi.writePoints(dataPoints)
 }

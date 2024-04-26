@@ -1,35 +1,47 @@
 import * as dotenv from 'dotenv'
-dotenv.config()
 const express = require('express');
 import { Request, Response } from 'express';
 import * as bodyParser from "body-parser";
-import { InfluxDB } from '@influxdata/influxdb-client';
+import { InfluxDB, Point } from '@influxdata/influxdb-client';
 import { addData } from '../influx-data-generator/data-generator';
 
-const url: string = process.env.INFLUX_URL!
-const token: string = process.env.INFLUX_TOKEN!
-const org: string = process.env.INFLUX_ORG!
-const bucket: string = process.env.INFLUX_BUCKET!
-
+dotenv.config()
 const app = express();
 const port = 3000;
 
 app.disable("x-powered-by");
 app.use(bodyParser.json());
 
-app.get('/', (req: Request, res: Response) => {
-  res.send('Hello, TypeScript with Express!');
-});
+const url: string = process.env.INFLUX_URL!
+const token: string = process.env.INFLUX_TOKEN!
+const org: string = process.env.INFLUX_ORG!
+const bucket: string = process.env.INFLUX_BUCKET!
 
-
-const client = new InfluxDB({ url: "http://localhost:8086/", token: "token123" });
-const queryApi = client.getQueryApi("org")
+const client = new InfluxDB({ url: url, token: token });
+const queryApi = client.getQueryApi(org)
 const fluxQuery = 'from(bucket: "test") |> range(start: 2024-01-01T08:00:00Z, stop: 2025-01-01T08:00:00Z)';
 
 // Middleware to parse JSON bodies
 app.use(express.json());
 
-addData(client, org, bucket)
+//addData(client, org, bucket)
+
+app.get('/', (req: Request, res: Response) => {
+  const writeApi = client.getWriteApi(org, bucket)
+
+  const point1 = new Point('temperature')
+  .tag('sensor_id', 'TLM01')
+  .floatField('value', 24.0)
+  console.log(` ${point1}`)
+
+  writeApi.writePoint(point1)
+  writeApi.close().then(() => {
+    console.log('WRITE FINISHED')
+  })
+  
+
+  res.send('Hello, TypeScript with Express!');
+});
 
 app.get('/api/influx-data', async (req: Request, res: Response) => {
   try {
