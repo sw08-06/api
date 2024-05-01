@@ -1,6 +1,7 @@
 import * as dotenv from 'dotenv'
 const express = require('express');
 import { Request, Response } from 'express';
+import cors from "cors";
 import * as bodyParser from "body-parser";
 import { InfluxDB } from '@influxdata/influxdb-client';
 import { addData } from '../influx-data-generator/data-generator';
@@ -11,6 +12,7 @@ const port = 3000;
 
 app.disable("x-powered-by");
 app.use(bodyParser.json());
+app.use(cors());
 
 const url: string = process.env.INFLUX_URL!
 const token: string = process.env.INFLUX_TOKEN!
@@ -26,8 +28,8 @@ const fluxQuery = 'from(bucket: "test") |> range(start: 2024-01-01T08:00:00Z, st
 app.use(express.json());
 
 app.get('/', (req: Request, res: Response) => {  
-  addData(client, org, bucket);
-  res.send('Hello, TypeScript with Express!');
+  //addData(client, org, bucket);
+  res.status(200).send('Hello, TypeScript with Express!');
 });
 
 app.get('/api/influx-data', async (req: Request, res: Response) => {
