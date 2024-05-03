@@ -27,8 +27,8 @@ const fluxQuery = 'from(bucket: "test") |> range(start: -31d)';
 // Middleware to parse JSON bodies
 app.use(express.json());
 
-app.get('/', (req: Request, res: Response) => {  
-  //addData(client, org, bucket);
+app.get('/', (req: Request, res: Response) => {
+  addData(writeApi, org, bucket);
   res.status(200).send('Hello, TypeScript with Express!');
 });
 
@@ -77,12 +77,15 @@ app.get('/api/predictions', async (req: Request, res: Response) => {
 
 // GET request from stress predictor
 app.get('/api/stress-predict', async (req: Request, res: Response) => {
-  let o: any;
+  console.log("latest window_size is: " + req.query["number_param"]);
 
-  queryApi.queryRows(`from(bucket: "test") |> range(start: -365d) |> filter(fn: (r) => r._measurement == "data" and r.window_id > ${res.locals.window_id})`, {
+  let o: any[] = [];
+  queryApi.queryRows(`from(bucket: "test") |> range(start: -31d) |> filter(fn: (r) => r._measurement == "data" and r.window_id > "${req.query["number_param"]}")`
+  , {
     next(row, tableMeta) {
-      o = tableMeta.toObject(row);                  // TODO: Check that this is correct
-      console.log(`${o._time} ${o._measurement}: ${o._field}=${o._value}`);
+      const rowData = tableMeta.toObject(row)
+      console.log(`${rowData._time} ${rowData._measurement}: ${rowData._field}=${rowData._value}`);
+      o.push(rowData);
     },
     error(error) {
       console.error('Error fetching data from InfluxDB:', error);
