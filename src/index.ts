@@ -21,7 +21,7 @@ const bucket: string = process.env.INFLUX_BUCKET!
 
 const client = new InfluxDB({ url: url, token: token });
 const queryApi = client.getQueryApi(org)
-const fluxQuery = 'from(bucket: "test") |> range(start: 2024-01-01T08:00:00Z, stop: 2025-01-01T08:00:00Z)';
+const fluxQuery = 'from(bucket: "test") |> range(start: -31d)';
 
 
 // Middleware to parse JSON bodies
@@ -54,6 +54,35 @@ app.get('/api/influx-data', async (req: Request, res: Response) => {
     res.status(500).send('Internal server error');
   }
 });
+
+// GET request from frontend 
+app.get('/api/predictions', async (req: Request, res: Response) => {
+  let o: any;
+  queryApi.queryRows('from(bucket: "test") |> range(start: -365d) |> filter(fn: (r) => r._measurement == "prediction")', {
+    next(row, tableMeta) {
+      o = tableMeta.toObject(row);                  // TODO: Check that this is correct
+      console.log(`${o._time} ${o._measurement}: ${o._field}=${o._value}`);
+    },
+    error(error) {
+      console.error('Error fetching data from InfluxDB:', error);
+      res.status(500).send('Internal server error');
+    },
+    complete() {
+      console.log('Finished SUCCESS');
+      res.status(200).json(o);
+    },
+  })
+});
+
+// GET request from stress predictor
+app.get('/api/stress-predict', async (req: Request, res: Response) => {
+  
+});
+
+// POST request from stress predictor
+app.post('/api/stress-predict', async (req: Request, res: Response) => {
+  
+})
 
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
