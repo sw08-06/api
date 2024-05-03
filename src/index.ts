@@ -3,7 +3,7 @@ const express = require('express');
 import { Request, Response } from 'express';
 import cors from "cors";
 import * as bodyParser from "body-parser";
-import { InfluxDB } from '@influxdata/influxdb-client';
+import { InfluxDB, Point } from '@influxdata/influxdb-client';
 import { addData } from '../influx-data-generator/data-generator';
 
 dotenv.config()
@@ -19,8 +19,8 @@ const token: string = process.env.INFLUX_TOKEN!
 const org: string = process.env.INFLUX_ORG!
 const bucket: string = process.env.INFLUX_BUCKET!
 
-const client = new InfluxDB({ url: url, token: token });
-const queryApi = client.getQueryApi(org)
+const queryApi = new InfluxDB({url, token }).getQueryApi(org);
+const writeApi = new InfluxDB({url, token}).getWriteApi(org, bucket);
 const fluxQuery = 'from(bucket: "test") |> range(start: -31d)';
 
 
@@ -58,6 +58,7 @@ app.get('/api/influx-data', async (req: Request, res: Response) => {
 // GET request from frontend 
 app.get('/api/predictions', async (req: Request, res: Response) => {
   let o: any;
+
   queryApi.queryRows('from(bucket: "test") |> range(start: -365d) |> filter(fn: (r) => r._measurement == "prediction")', {
     next(row, tableMeta) {
       o = tableMeta.toObject(row);                  // TODO: Check that this is correct
@@ -71,17 +72,47 @@ app.get('/api/predictions', async (req: Request, res: Response) => {
       console.log('Finished SUCCESS');
       res.status(200).json(o);
     },
-  })
+  });
 });
 
 // GET request from stress predictor
 app.get('/api/stress-predict', async (req: Request, res: Response) => {
-  
+  let o: any;
+
+  queryApi.queryRows(`from(bucket: "test") |> range(start: -365d) |> filter(fn: (r) => r._measurement == "data" and r.window_id > ${res.locals.window_id})`, {
+    next(row, tableMeta) {
+      o = tableMeta.toObject(row);                  // TODO: Check that this is correct
+      console.log(`${o._time} ${o._measurement}: ${o._field}=${o._value}`);
+    },
+    error(error) {
+      console.error('Error fetching data from InfluxDB:', error);
+      res.status(500).send('Internal server error');
+    },
+    complete() {
+      console.log('Finished SUCCESS');
+      res.status(200).json(o);
+    },
+  });
+
 });
 
 // POST request from stress predictor
 app.post('/api/stress-predict', async (req: Request, res: Response) => {
-  
+  const predictionsList = [];
+
+  for (let prediction of res.locals.predictions)
+    predictionsList.push(
+      new Point('prediction')
+      .tag('window_id', prediction.window_id)
+      .floatField('value', prediction.prediction)
+    );
+
+  writeApi.writePoints(predictionsList);
+  writeApi.close().then(() => {
+    console.log('WRITE FINISHED');
+    res.status(200).send();
+  });
+
 })
 
 app.listen(port, () => {
