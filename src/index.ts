@@ -26,7 +26,6 @@ const fluxQuery = 'from(bucket: "test") |> range(start: -31d)';
 
 // Middleware to parse JSON bodies
 app.use(express.json());
-
 app.get('/', (req: Request, res: Response) => {
   addData(writeApi, org, bucket);
   res.status(200).send('Hello, TypeScript with Express!');
@@ -76,11 +75,53 @@ app.get('/api/predictions', async (req: Request, res: Response) => {
 });
 
 // GET request from stress predictor
+app.route("/api/stress-predict")
+  .get(async (req: Request, res: Response) => {
+    console.log("latest window_size is: " + req.query["number_param"]);
+
+    let o: any[] = [];
+    queryApi.queryRows(`from(bucket: "test") |> range(start: -31d) |> filter(fn: (r) => r._measurement == "data" and r.window_id == "${req.query["number_param"]}")`, 
+    {
+      next(row, tableMeta) {
+        const rowData = tableMeta.toObject(row)
+        console.log(`${rowData._time} ${rowData._measurement}: ${rowData._field}=${rowData._value}`);
+        o.push(rowData);
+      },
+      error(error) {
+        console.error('Error fetching data from InfluxDB:', error);
+        res.status(500).send('Internal server error');
+      },
+      complete() {
+        console.log('Finished SUCCESS');
+        res.status(200).json(o);
+      },
+    });
+  })
+  .post(async (req: Request, res: Response) => {
+    console.log("sup");
+    const predictionsList = [];
+
+    for (let prediction of res.locals.predictions)
+      predictionsList.push(
+        new Point('prediction')
+        .tag('window_id', prediction.window_id)
+        .floatField('value', prediction.prediction)
+      );
+
+    writeApi.writePoints(predictionsList);
+    writeApi.close().then(() => {
+      console.log('WRITE FINISHED');
+      res.status(200).send();
+    });
+
+  });
+
+/*
 app.get('/api/stress-predict', async (req: Request, res: Response) => {
   console.log("latest window_size is: " + req.query["number_param"]);
 
   let o: any[] = [];
-  queryApi.queryRows(`from(bucket: "test") |> range(start: -31d) |> filter(fn: (r) => r._measurement == "data" and r.window_id > "${req.query["number_param"]}")`
+  queryApi.queryRows(`from(bucket: "test") |> range(start: -31d) |> filter(fn: (r) => r._measurement == "data" and r.window_id == "${req.query["number_param"]}")`
   , {
     next(row, tableMeta) {
       const rowData = tableMeta.toObject(row)
@@ -101,6 +142,7 @@ app.get('/api/stress-predict', async (req: Request, res: Response) => {
 
 // POST request from stress predictor
 app.post('/api/stress-predict', async (req: Request, res: Response) => {
+  console.log("sup");
   const predictionsList = [];
 
   for (let prediction of res.locals.predictions)
@@ -116,7 +158,7 @@ app.post('/api/stress-predict', async (req: Request, res: Response) => {
     res.status(200).send();
   });
 
-})
+})*/
 
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
