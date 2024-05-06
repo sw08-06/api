@@ -20,13 +20,13 @@ const org: string = process.env.INFLUX_ORG!
 const bucket: string = process.env.INFLUX_BUCKET!
 
 const queryApi = new InfluxDB({url, token }).getQueryApi(org);
-const writeApi = new InfluxDB({url, token}).getWriteApi(org, bucket);
 const fluxQuery = 'from(bucket: "test") |> range(start: -31d)';
 
 
 // Middleware to parse JSON bodies
 app.use(express.json());
 app.get('/', (req: Request, res: Response) => {
+  const writeApi = new InfluxDB({url, token}).getWriteApi(org, bucket);
   addData(writeApi, org, bucket);
   res.status(200).send('Hello, TypeScript with Express!');
 });
@@ -98,6 +98,7 @@ app.route("/api/stress-predict")
     });
   })
   .post(async (req: Request, res: Response) => {
+    const writeApi = new InfluxDB({url, token}).getWriteApi(org, bucket);
     console.log("latest prediction is: " + req.query["number_param"]);
   
     writeApi.writePoint(
