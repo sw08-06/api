@@ -4,7 +4,7 @@ import { Request, Response } from 'express';
 import cors from "cors";
 import * as bodyParser from "body-parser";
 import { InfluxDB, Point } from '@influxdata/influxdb-client';
-import { addData } from '../influx-data-generator/data-generator';
+import { addData, addPredictions } from '../influx-data-generator/data-generator';
 
 dotenv.config()
 const app = express();
@@ -19,15 +19,17 @@ const token: string = process.env.INFLUX_TOKEN!
 const org: string = process.env.INFLUX_ORG!
 const bucket: string = process.env.INFLUX_BUCKET!
 
-const queryApi = new InfluxDB({url, token }).getQueryApi(org);
+const queryApi = new InfluxDB({url, token}).getQueryApi(org);
 const fluxQuery = 'from(bucket: "test") |> range(start: -31d)';
 
 
 // Middleware to parse JSON bodies
 app.use(express.json());
+
 app.get('/', (req: Request, res: Response) => {
   const writeApi = new InfluxDB({url, token}).getWriteApi(org, bucket);
-  addData(writeApi, org, bucket);
+  //addPredictions(writeApi);
+  addData(writeApi)
   res.status(200).send('Hello, TypeScript with Express!');
 });
 
@@ -77,13 +79,46 @@ app.get('/api/predictions', async (req: Request, res: Response) => {
 // GET request from stress predictor
 app.route("/api/stress-predict")
   .get(async (req: Request, res: Response) => {
-    console.log("latest window_size is: " + req.query["number_param"]);
-
     let o: any[] = [];
-    queryApi.queryRows(`from(bucket: "test") |> range(start: -31d) |> filter(fn: (r) => r._measurement == "data" and r.window_id == "${req.query["number_param"]}")`, 
+    let next_window_to_predict: any;
+
+    // get latest prediction from db
+      // if no prediction -> check for lowest window_id value
+    // send
+
+  
+    const find_max_window_query = `from(bucket: "test") 
+      |> range(start: -inf) 
+      |> filter(fn: (r) => r["_measurement"] == "prediction") 
+      |> filter(fn: (r) => r["_field"] == "window_id") 
+      |> max()`;
+
+      queryApi.queryRows(find_max_window_query, 
+      {
+        next(row, tableMeta) {
+          const rowData = tableMeta.toObject(row)
+          console.log(`${rowData._measurement}: ${rowData._field}=${rowData._value}`);
+          next_window_to_predict = rowData._value + 1 ;
+        },
+        error(error) {
+          console.error('Error fetching data from InfluxDB:', error);
+          res.status(500).send('Internal server error');
+        },
+        complete() {
+          console.log('find max window query completed.');
+          console.log(`The window found is: ${next_window_to_predict}`);
+        },
+      });
+
+      // TODO: Check if any window_id was found. If not, query for the smallest window_id
+
+    queryApi.queryRows(`from(bucket: "test") 
+      |> range(start: -inf)
+      |> filter(fn: (r) => r._measurement == "data" and r._field == "window_id" and r._value == 8)`, 
     {
       next(row, tableMeta) {
         const rowData = tableMeta.toObject(row)
+        console.log("Query for data larger than last window.")
         console.log(`${rowData._time} ${rowData._measurement}: ${rowData._field}=${rowData._value}`);
         o.push(rowData);
       },
@@ -96,17 +131,18 @@ app.route("/api/stress-predict")
         res.status(200).json(o);
       },
     });
+
   })
   .post(async (req: Request, res: Response) => {
     const writeApi = new InfluxDB({url, token}).getWriteApi(org, bucket);
-    console.log("latest prediction is: " + req.query["number_param"]);
+    console.log("latest prediction is: " + req.body.prediction);
   
     writeApi.writePoint(
       new Point('prediction')
         .tag('window_id', String(req.query["number_param"]))
-        .floatField('value', req.query["prediction"])
+        .floatField('value', req.body.prediction)
     );
-    writeApi.close().then(() => {    // TODO: .close() weird behavior when posting twice (Error: writeApi: already closed!)
+    writeApi.close().then(() => {
       console.log('WRITE FINISHED');
       res.status(200).send();
     });
