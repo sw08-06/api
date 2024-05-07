@@ -20,7 +20,6 @@ const org: string = process.env.INFLUX_ORG!
 const bucket: string = process.env.INFLUX_BUCKET!
 
 const queryApi = new InfluxDB({url, token}).getQueryApi(org);
-const fluxQuery = 'from(bucket: "test") |> range(start: -31d)';
 
 // Middleware to parse JSON bodies
 app.use(express.json());
@@ -31,7 +30,6 @@ app.get('/', (req: Request, res: Response) => {
 	addData(writeApi)
 	res.status(200).send('Hello, TypeScript with Express!');
 });
-
 
 // GET request from frontend 
 app.get('/api/predictions', async (req: Request, res: Response) => {
@@ -75,10 +73,8 @@ app.route("/api/stress-predict")
 				res.status(500).send('Internal server error');
 			},
 			complete() {
-				console.log('find max window query completed.');
 				console.log(`The window found is: ${next_window_to_predict}`);
 
-				// TODO: Check if any window_id was found. If not, query for the smallest window_id
 				if(next_window_to_predict == null) {
 					influxdbQuerier(
 						`from(bucket: "test") 
