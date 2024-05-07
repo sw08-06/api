@@ -27,7 +27,7 @@ app.use(express.json());
 
 app.get('/', (req: Request, res: Response) => {
   const writeApi = new InfluxDB({url, token}).getWriteApi(org, bucket);
-  //addPredictions(writeApi);
+  addPredictions(writeApi);
   addData(writeApi)
   res.status(200).send('Hello, TypeScript with Express!');
 });
@@ -61,7 +61,6 @@ app.route("/api/stress-predict")
     // get latest prediction from db
       // if no prediction -> check for lowest window_id value
     // send
-
   
     const find_max_window_query = `from(bucket: "test") 
       |> range(start: -inf) 
@@ -83,52 +82,58 @@ app.route("/api/stress-predict")
         complete() {
           console.log('find max window query completed.');
           console.log(`The window found is: ${next_window_to_predict}`);
+
+          // TODO: Check if any window_id was found. If not, query for the smallest window_id
+          if(next_window_to_predict == null) {
+            queryApi.queryRows(`from(bucket: "test") 
+              |> range(start: -inf)
+              |> filter(fn: (r) => r._measurement == "data" and r._field == "window_id")
+              |> min()`,
+            {
+              next(row, tableMeta) {
+                const rowData = tableMeta.toObject(row)
+                console.log("Query for data larger than last window.")
+                console.log(`${rowData._time} ${rowData._measurement}: ${rowData._field}=${rowData._value}`);
+                o.push(rowData);
+              },
+              error(error) {
+                console.error('Error fetching data from InfluxDB:', error);
+                res.status(500).send('Internal server error');
+              },
+              complete() {
+                console.log('if branch: Finished SUCCESS');
+                if(next_window_to_predict == null)
+                  res.status(404).send("No data available");
+                else
+                  res.status(200).json(o);
+              },
+            });
+          } else {
+            queryApi.queryRows(`from(bucket: "test") 
+              |> range(start: -inf)
+              |> filter(fn: (r) => r._measurement == "data" and r._field == "window_id" and r._value == ${next_window_to_predict})`, // TODO: unable to use ${} for the 8
+            {
+              next(row, tableMeta) {
+                const rowData = tableMeta.toObject(row)
+                console.log("Query for data larger than last window.")
+                console.log(`${rowData._time} ${rowData._measurement}: ${rowData._field}=${rowData._value}`);
+                o.push(rowData);
+              },
+              error(error) {
+                console.error('Error fetching data from InfluxDB:', error);
+                res.status(500).send('Internal server error');
+              },
+              complete() {
+                console.log('else branch: Finished SUCCESS');
+                res.status(200).json(o);
+              },
+            });
+          }
+
         },
       });
 
-      // TODO: Check if any window_id was found. If not, query for the smallest window_id
-    if(next_window_to_predict == null) {
-      queryApi.queryRows(`from(bucket: "test") 
-        |> range(start: -inf)
-        |> filter(fn: (r) => r._measurement == "data" and r._field == "window_id")
-        |> min()`,
-      {
-        next(row, tableMeta) {
-          const rowData = tableMeta.toObject(row)
-          console.log("Query for data larger than last window.")
-          console.log(`${rowData._time} ${rowData._measurement}: ${rowData._field}=${rowData._value}`);
-          o.push(rowData);
-        },
-        error(error) {
-          console.error('Error fetching data from InfluxDB:', error);
-          res.status(500).send('Internal server error');
-        },
-        complete() {
-          console.log('if branch: Finished SUCCESS');
-          res.status(200).json(o);
-        },
-      });
-    } else {
-      queryApi.queryRows(`from(bucket: "test") 
-        |> range(start: -inf)
-        |> filter(fn: (r) => r._measurement == "data" and r._field == "window_id" and r._value == 8)`, // TODO: unable to use ${} for the 8
-      {
-        next(row, tableMeta) {
-          const rowData = tableMeta.toObject(row)
-          console.log("Query for data larger than last window.")
-          console.log(`${rowData._time} ${rowData._measurement}: ${rowData._field}=${rowData._value}`);
-          o.push(rowData);
-        },
-        error(error) {
-          console.error('Error fetching data from InfluxDB:', error);
-          res.status(500).send('Internal server error');
-        },
-        complete() {
-          console.log('else branch: Finished SUCCESS');
-          res.status(200).json(o);
-        },
-      });
-    }
+    
 
   })
   .post(async (req: Request, res: Response) => {
@@ -149,3 +154,7 @@ app.route("/api/stress-predict")
 app.listen(port, () => {
   console.log(`Server is running on http://localhost:${port}`);
 });
+
+function influxdbQuerier() {
+  
+}
