@@ -51,10 +51,27 @@ app.get("/api/predictions", async (req: Request, res: Response) => {
 	});
 });
 
-// app.post("/api/stress-generator", async (req: Request, res: Response) => {
-// 	const writeApi = new InfluxDB({url, token}).getWriteApi(org, bucket);
+app.post("/api/stress-generator", async (req: Request, res: Response) => {
+	const writeApi = new InfluxDB({url, token}).getWriteApi(org, bucket);
+	let list_of_points: any[] = [];
 
-// });
+	if(Array.isArray(req.body))
+		req.body.forEach(item => {
+			list_of_points.push(
+				new Point('data')
+					.timestamp(item.time)
+					.tag('data_type', item.data_type)
+					.intField('window_id', item.window_id)
+					.intField('index', item.index)
+					.intField('value', item.value)
+			);
+		});
+		writeApi.writePoints(list_of_points);
+		writeApi.close().then(() => {
+			console.log('WRITE FINISHED');
+			res.status(200).send();
+		});
+});
 
 // GET request from stress predictor
 app.route("/api/stress-predict")
@@ -103,23 +120,17 @@ app.route("/api/stress-predict")
 	})
 	.post(async (req: Request, res: Response) => {
 		const writeApi = new InfluxDB({url, token}).getWriteApi(org, bucket);
-		console.log("latest prediction is: " + req.body.prediction);
-		//console.log("latest prediction is: " + req.body.data);
-		console.log("latest prediction is: " + req.body[0].time);
-	
-		// TODO: In this endpoint we either get prediction in two forms
-					// a single prediction (0 or 1) from stress predictor or a list of predictions ([0|1]) from stress generator.
-		// Checks if the request comes from the stress generator (req.body is of type list of Object) or stress predictor (req.body is of type Object)
+
+		// Checks if the request comes from the stress generator (req.body is of type list of Object) or 
+		// stress predictor (req.body is of type Object).
 		if(Array.isArray(req.body)){
 			let list_of_points: any[] = [];
 			req.body.forEach(item => {
-				// console.log("time is: " + item.time);
-				// console.log("window is: " + item.fields.window_id)
 				list_of_points.push(
 					new Point('prediction')
-						//.timestamp(Date.parse(item.time))
-						.intField('window_id', item.fields.window_id)
-						.intField('value', item.fields.value)
+						.timestamp(item.time)   // TODO: fix bad timestamp issue
+						.intField('window_id', item.window_id)
+						.intField('value', item.value)
 				);
 			});
 			writeApi.writePoints(list_of_points);
@@ -130,7 +141,7 @@ app.route("/api/stress-predict")
 		} else {
 			writeApi.writePoint(
 				new Point('prediction')
-					.tag('window_id', String(req.query["number_param"]))
+					.intField('window_id', req.query["number_param"])
 					.intField('value', req.body.prediction)
 			);
 			writeApi.close().then(() => {
@@ -138,9 +149,6 @@ app.route("/api/stress-predict")
 				res.status(200).send();
 			});
 		}
-
-			
-		
 	});
 
 app.listen(port, () => {
