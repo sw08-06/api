@@ -125,10 +125,13 @@ app.route("/api/stress-predict")
 		// stress predictor (req.body is of type Object).
 		if(Array.isArray(req.body)){
 			let list_of_points: any[] = [];
+			
 			req.body.forEach(item => {
+				const milliseconds = new Date(item.time + "Z").getTime();
+				const nanoseconds = milliseconds * 1e6;
 				list_of_points.push(
 					new Point('prediction')
-						.timestamp(item.time)   // TODO: fix bad timestamp issue
+						.timestamp(nanoseconds)
 						.intField('window_id', item.window_id)
 						.intField('value', item.value)
 				);
