@@ -32,7 +32,7 @@ app.get("/", (req: Request, res: Response) => {
 app.get("/api/predictions", async (req: Request, res: Response) => {
 	let o: any;
 
-	queryApi.queryRows(`from(bucket: "${bucket}") |> range(start: -365d) |> filter(fn: (r) => r._measurement == "prediction")`, {
+	queryApi.queryRows(`from(bucket: "${bucket}") |> range(start: -inf) |> filter(fn: (r) => r._measurement == "prediction")`, {
 		next(row, tableMeta) {
 			o = tableMeta.toObject(row);                  // TODO: Check that this is correct
 			console.log(`${o._time} ${o._measurement}: ${o._field}=${o._value}`);
@@ -91,7 +91,7 @@ app.route("/api/stress-predict")
 					res.status(500).send('Internal server error');
 				},
 				complete() {
-					console.log(`The window found is: ${next_window_to_predict}`);
+					console.log(`The next window found is: ${next_window_to_predict}`);
 
 					if (next_window_to_predict == null) {
 						influxdbQuerier(
@@ -107,7 +107,8 @@ app.route("/api/stress-predict")
 							`from(bucket: "${bucket}") 
 							|> range(start: -inf)
 							|> filter(fn: (r) => r._measurement == "data" and 
-								r._field == "window_id" and r._value == ${next_window_to_predict})`,
+								r._field == "window_id" and r._value >= ${next_window_to_predict})
+							|> min()`,
 							next_window_to_predict,
 							res
 						);
