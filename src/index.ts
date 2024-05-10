@@ -23,10 +23,7 @@ const queryApi = new InfluxDB({ url, token }).getQueryApi(org);
 
 app.use(express.json());
 
-app.get("/", (req: Request, res: Response) => {
-	const writeApi = new InfluxDB({ url, token }).getWriteApi(org, bucket);
-	res.status(200).send('Hello, TypeScript with Express!');
-});
+app.get("/", (req: Request, res: Response) => { res.status(200).send('Hello, TypeScript with Express!'); });
 
 // GET request from frontend 
 app.get("/api/predictions", async (req: Request, res: Response) => {
@@ -34,7 +31,7 @@ app.get("/api/predictions", async (req: Request, res: Response) => {
 
 	queryApi.queryRows(`from(bucket: "${bucket}") |> range(start: -inf) |> filter(fn: (r) => r._measurement == "prediction")`, {
 		next(row, tableMeta) {
-			o = tableMeta.toObject(row);                  // TODO: Check that this is correct
+			o = tableMeta.toObject(row);
 			console.log(`${o._time} ${o._measurement}: ${o._field}=${o._value}`);
 		},
 		error(error) {
@@ -58,9 +55,9 @@ app.post("/api/stress-generator", async (req: Request, res: Response) => {
 				new Point('data')
 					.timestamp(item.time)
 					.tag('data_type', item.data_type)
-					.intField('window_id', item.window_id)
+					.tag('window_id', item.window_id)
 					.intField('index', item.index)
-					.intField('value', item.value)
+					.floatField('value', item.value)
 			);
 		});
 	writeApi.writePoints(list_of_points);
@@ -73,7 +70,7 @@ app.post("/api/stress-generator", async (req: Request, res: Response) => {
 // GET request from stress predictor
 app.route("/api/stress-predict")
 	.get(async (req: Request, res: Response) => {
-		let next_window_to_predict: number | null = null;
+		let next_window_id_to_predict: number = 0;
 
 		queryApi.queryRows(`from(bucket: "${bucket}") 
 		|> range(start: -inf)
@@ -84,35 +81,42 @@ app.route("/api/stress-predict")
 				next(row, tableMeta) {
 					const rowData = tableMeta.toObject(row)
 					console.log(`${rowData._measurement}: ${rowData._field}=${rowData._value}`);
-					next_window_to_predict = rowData._value + 1;
+					next_window_id_to_predict = rowData._value + 1;
 				},
 				error(error) {
 					console.error('Error fetching data from InfluxDB:', error);
 					res.status(500).send('Internal server error');
 				},
-				complete() {
-					console.log(`The next window found is: ${next_window_to_predict}`);
+				async complete() {
+					console.log(`\nThe next window found is: ${next_window_id_to_predict}\n`);
+					 let min_window = await influxdbQuerier(
+						`from(bucket: "${bucket}")
+						|> range(start: -inf)
+						|> filter(fn: (r) => r["_measurement"] == "data" and r["window_id"] >= "${next_window_id_to_predict}")
+						|> min()`,
+						res
+					);
 
-					if (next_window_to_predict == null) {
-						influxdbQuerier(
-							`from(bucket: "${bucket}") 
+
+
+					if(Array.isArray(min_window)) {
+						console.log("\n\nthis is the min_win value:: " + min_window[0].window_id);
+
+						let next_window_to_predict = await influxdbQuerier(
+							`from(bucket: "${bucket}")
 							|> range(start: -inf)
-							|> filter(fn: (r) => r._measurement == "data" and r._field == "window_id")
-							|> min()`,
-							next_window_to_predict,
+							|> filter(fn: (r) => r["_measurement"] == "data" and r["window_id"] == "${min_window[0].window_id}")`,
 							res
 						);
+						
+						console.log("comeon now!: " + next_window_to_predict);
+						res.status(200).json(next_window_to_predict);
 					} else {
-						influxdbQuerier(
-							`from(bucket: "${bucket}") 
-							|> range(start: -inf)
-							|> filter(fn: (r) => r._measurement == "data" and 
-								r._field == "window_id" and r._value >= ${next_window_to_predict})
-							|> min()`,
-							next_window_to_predict,
-							res
-						);
+						console.log("There is no data available");
+						res.status(404).send('There is no data available');
 					}
+
+					
 				},
 			});
 	})
@@ -156,24 +160,26 @@ app.listen(port, () => {
 	console.log(`Server is running on http://localhost:${port}`);
 });
 
-function influxdbQuerier(query: string, next_window_to_predict: number | null, res: Response) {
-	let list_of_results: any[] = [];
-	queryApi.queryRows(query,
-		{
-			next(row, tableMeta) {
-				const rowData = tableMeta.toObject(row)
-				console.log(`${rowData._measurement}: ${rowData._field}=${rowData._value}`);
-				list_of_results.push(rowData);
-			},
-			error(error) {
-				console.error('Error fetching data from InfluxDB:', error);
-				res.status(500).send('Internal server error');
-			},
-			complete() {
-				if (next_window_to_predict == null)
-					res.status(404).send("No data available");
+async function influxdbQuerier(query: string, res: Response): Promise<any> {
+    return new Promise((resolve, reject) => {
+        let list_of_results: any[] = [];
+        queryApi.queryRows(query, {
+            next(row, tableMeta) {
+                const rowData = tableMeta.toObject(row)
+                // console.log(`${rowData._measurement}: ${rowData._field}=${rowData._value}`);
+                list_of_results.push(rowData);
+            },
+            error(error) {
+                console.error('Error fetching data from InfluxDB:', error);
+                res.status(500).send('Internal server error');
+                reject(error);
+            },
+            complete() {
+				if(list_of_results === undefined || list_of_results.length == 0)
+					resolve("No data available")
 				else
-					res.status(200).json(list_of_results);
-			},
-		});
+               		resolve(list_of_results);
+            },
+        });
+    });
 }
