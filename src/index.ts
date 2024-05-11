@@ -56,7 +56,6 @@ app.post("/api/stress-generator", async (req: Request, res: Response) => {
 					.timestamp(item.time)
 					.tag('data_type', item.data_type)
 					.tag('window_id', item.window_id)
-					.intField('index', item.index)
 					.floatField('value', item.value)
 			);
 		});
@@ -109,7 +108,7 @@ app.route("/api/stress-predict")
 							res
 						);
 						
-						console.log("comeon now!: " + next_window_to_predict);
+						//console.log("comeon now!: " + next_window_to_predict);
 						res.status(200).json(next_window_to_predict);
 					} else {
 						console.log("There is no data available");
@@ -127,15 +126,12 @@ app.route("/api/stress-predict")
 		// stress predictor (req.body is of type Object).
 		if (Array.isArray(req.body)) {
 			let list_of_points: any[] = [];
-
 			req.body.forEach(item => {
-				const milliseconds = new Date(item.time + "Z").getTime();
-				const nanoseconds = milliseconds * 1e6;
 				list_of_points.push(
 					new Point('prediction')
-						.timestamp(nanoseconds)
+						.timestamp(item.time)
 						.intField('window_id', item.window_id)
-						.intField('value', item.value)
+						.intField('value', item.prediction)
 				);
 			});
 			writeApi.writePoints(list_of_points);
@@ -146,7 +142,8 @@ app.route("/api/stress-predict")
 		} else {
 			writeApi.writePoint(
 				new Point('prediction')
-					.intField('window_id', req.query["number_param"])
+					.timestamp(req.body.time)
+					.intField('window_id', req.body.window_id)
 					.intField('value', req.body.prediction)
 			);
 			writeApi.close().then(() => {
