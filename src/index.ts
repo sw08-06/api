@@ -28,7 +28,7 @@ app.get("/", (req: Request, res: Response) => { res.status(200).send('Hello, Typ
 // GET request from frontend 
 app.get("/api/predictions", async (req: Request, res: Response) => {
 	let list_of_results: any[] = [];
-	queryApi.queryRows(`from(bucket: "${bucket}") |> range(start: -inf) |> filter(fn: (r) => r._measurement == "prediction")`, {
+	queryApi.queryRows(`from(bucket: "${bucket}") |> range(start: -28d) |> filter(fn: (r) => r._measurement == "prediction" and r["_field"] == "value")`, {
 		next(row, tableMeta) {
 			const rowData = tableMeta.toObject(row)
 			// console.log(`${rowData._measurement}: ${rowData._field}=${rowData._value}`);
