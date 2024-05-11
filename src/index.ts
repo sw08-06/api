@@ -131,7 +131,7 @@ app.route("/api/stress-predict")
 					new Point('prediction')
 						.timestamp(item.time)
 						.intField('window_id', item.window_id)
-						.intField('value', item.prediction)
+						.intField('value', item.value)
 				);
 			});
 			writeApi.writePoints(list_of_points);
