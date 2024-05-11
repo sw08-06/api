@@ -27,21 +27,21 @@ app.get("/", (req: Request, res: Response) => { res.status(200).send('Hello, Typ
 
 // GET request from frontend 
 app.get("/api/predictions", async (req: Request, res: Response) => {
-	let o: any;
-
+	let list_of_results: any[] = [];
 	queryApi.queryRows(`from(bucket: "${bucket}") |> range(start: -inf) |> filter(fn: (r) => r._measurement == "prediction")`, {
 		next(row, tableMeta) {
-			o = tableMeta.toObject(row);
-			console.log(`${o._time} ${o._measurement}: ${o._field}=${o._value}`);
+			const rowData = tableMeta.toObject(row)
+			// console.log(`${rowData._measurement}: ${rowData._field}=${rowData._value}`);
+			list_of_results.push(rowData);
 		},
-		error(error) {
-			console.error('Error fetching data from InfluxDB:', error);
-			res.status(500).send('Internal server error');
-		},
-		complete() {
-			console.log('Finished SUCCESS');
-			res.status(200).json(o);
-		},
+	error(error) {
+		console.error('Error fetching data from InfluxDB:', error);
+		res.status(500).send('Internal server error');
+	},
+	complete() {
+		console.log('Finished SUCCESS');
+		res.status(200).json(list_of_results);
+	},
 	});
 });
 
