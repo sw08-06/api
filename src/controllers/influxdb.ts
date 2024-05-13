@@ -24,10 +24,10 @@ export async function influxdbQuerier(query: string, res: Response): Promise<any
                 reject(error);
             },
             complete() {
-				if(list_of_results === undefined || list_of_results.length == 0)
-					resolve("No data available")
-				else
-               		resolve(list_of_results);
+                if (list_of_results === undefined || list_of_results.length == 0)
+                    resolve("No data available")
+                else
+                    resolve(list_of_results);
             },
         });
     });

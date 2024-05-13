@@ -6,7 +6,7 @@ import { url, token, org, bucket } from '../controllers/influxdb';
 const router = express.Router();
 
 router.post('/', async (req: Request, res: Response) => {
-    const writeApi = new InfluxDB({ url, token }).getWriteApi(org, bucket);
+	const writeApi = new InfluxDB({ url, token }).getWriteApi(org, bucket);
 	let list_of_points: any[] = [];
 	console.log("\n This is the stress generator \n");
 
