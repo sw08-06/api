@@ -3,7 +3,6 @@ import { InfluxDB } from '@influxdata/influxdb-client';
 import { Response } from 'express';
 
 dotenv.config();
-export const apiUrl: string = process.env.API_URL!;
 export const url: string = process.env.INFLUX_URL!;
 export const token: string = process.env.INFLUX_TOKEN!;
 export const org: string = process.env.INFLUX_ORG!;
