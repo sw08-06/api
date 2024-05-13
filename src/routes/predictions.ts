@@ -1,6 +1,7 @@
 import express from 'express';
 import { Request, Response } from 'express';
 import { queryApi, bucket } from '../controllers/influxdb';
+import { generateDiagramBins } from '../controllers/diagrams';
 
 const router = express.Router();
 
@@ -16,7 +17,8 @@ router.get('/', async (req: Request, res: Response) => {
 	},
 	complete() {
 		console.log('Finished SUCCESS');
-		res.status(200).json(list_of_results);
+		let bins = generateDiagramBins(list_of_results);
+		res.status(200).json(bins);
 	},
 	});
 });

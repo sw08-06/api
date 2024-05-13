@@ -18,7 +18,7 @@ function getWeekEndDate(date: string): string {
     return `${month < 10 ? '0' : ''}${month}/${dayOfMonth < 10 ? '0' : ''}${dayOfMonth}`;
 }
 
-function heatmapBins(data: any) {
+export function generateDiagramBins(data: any) {
     let bins: { day: string; week: string; value: number; distribution: { group: string, value: number }[] }[] = [];
     let bin: { day: string; week: string; value: number; distribution: { group: string, value: number }[] } | undefined = undefined;
     let date: string = '';
@@ -36,10 +36,9 @@ function heatmapBins(data: any) {
                 day: currentDay,
                 week: `${currentWeekStart} - ${currentWeekEnd}`,
                 value: data[i]._value,
-                distribution: [] // Initialize distribution property
+                distribution: []
             };
 
-            // Initialize distribution for each three-hour interval
             for (let j = 0; j < 8; j++) {
                 bin.distribution.push({ group: `${j * 3}-${(j + 1) * 3}`, value: 0 });
             }
@@ -51,7 +50,6 @@ function heatmapBins(data: any) {
             }
         }
 
-        // Update the corresponding three-hour interval in distribution
         const hour = new Date(data[i]._time).getHours();
         const intervalIndex = Math.floor(hour / 3);
         if (bin && intervalIndex >= 0 && intervalIndex < 8) {
