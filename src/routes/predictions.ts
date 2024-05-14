@@ -16,7 +16,7 @@ router.get('/', async (req: Request, res: Response) => {
 			res.status(500).send('Internal server error');
 		},
 		complete() {
-			console.log('Finished SUCCESS');
+			console.log('Predictions sent to UI');
 			let bins = generateDiagramBins(list_of_results);
 			res.status(200).json(bins);
 		},

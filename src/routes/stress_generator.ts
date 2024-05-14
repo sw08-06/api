@@ -8,7 +8,6 @@ const router = express.Router();
 router.post('/', async (req: Request, res: Response) => {
 	const writeApi = new InfluxDB({ url, token }).getWriteApi(org, bucket);
 	let list_of_points: any[] = [];
-	console.log("\n This is the stress generator \n");
 
 	if (Array.isArray(req.body))
 		req.body.forEach(item => {
@@ -22,7 +21,7 @@ router.post('/', async (req: Request, res: Response) => {
 		});
 	writeApi.writePoints(list_of_points);
 	writeApi.close().then(() => {
-		console.log('WRITE FINISHED');
+		console.log('Generated data written to DB');
 		res.status(200).send();
 	});
 });

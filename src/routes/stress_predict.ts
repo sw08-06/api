@@ -16,7 +16,6 @@ router.get('/', async (req: Request, res: Response) => {
         {
             next(row, tableMeta) {
                 const rowData = tableMeta.toObject(row)
-                console.log(`${rowData._measurement}: ${rowData._field}=${rowData._value}`);
                 next_window_id_to_predict = rowData._value + 1;
             },
             error(error) {
@@ -24,7 +23,6 @@ router.get('/', async (req: Request, res: Response) => {
                 res.status(500).send('Internal server error');
             },
             async complete() {
-                console.log(`\nThe next window found is: ${next_window_id_to_predict}\n`);
                 let min_window = await influxdbQuerier(
                     `from(bucket: "${bucket}")
                     |> range(start: -inf)
@@ -33,10 +31,8 @@ router.get('/', async (req: Request, res: Response) => {
                     res
                 );
 
-
-
-                if (Array.isArray(min_window)) {
-                    console.log("\n\nthis is the min_win value:: " + min_window[0].window_id);
+                try {
+                    console.log("\nthis is the min_win value:: " + min_window[0].window_id);
 
                     let next_window_to_predict = await influxdbQuerier(
                         `from(bucket: "${bucket}")
@@ -44,15 +40,12 @@ router.get('/', async (req: Request, res: Response) => {
                         |> filter(fn: (r) => r["_measurement"] == "data" and r["window_id"] == "${min_window[0].window_id}")`,
                         res
                     );
-
-                    //console.log("comeon now!: " + next_window_to_predict);
+                    
                     res.status(200).json(next_window_to_predict);
-                } else {
-                    console.log("There is no data available");
-                    res.status(404).send('There is no data available');
+                } catch (error) {
+                    console.log("There is no new data available");
+                    res.status(204).send();
                 }
-
-
             },
         });
 });
@@ -74,7 +67,7 @@ router.post('/', async (req: Request, res: Response) => {
         });
         writeApi.writePoints(list_of_points);
         writeApi.close().then(() => {
-            console.log('WRITE FINISHED');
+            console.log('Generated predictions written to DB');
             res.status(200).send();
         });
     } else {
@@ -85,7 +78,7 @@ router.post('/', async (req: Request, res: Response) => {
                 .intField('value', req.body.prediction)
         );
         writeApi.close().then(() => {
-            console.log('WRITE FINISHED');
+            console.log('New prediction written to DB');
             res.status(200).send();
         });
     }
