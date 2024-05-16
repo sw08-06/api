@@ -24,7 +24,7 @@ export async function influxdbQuerier(query: string, res: Response): Promise<any
                 reject(error);
             },
             complete() {
-                    resolve(list_of_results);
+                resolve(list_of_results);
             },
         });
     });

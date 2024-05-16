@@ -40,7 +40,7 @@ router.get('/', async (req: Request, res: Response) => {
                         |> filter(fn: (r) => r["_measurement"] == "data" and r["window_id"] == "${min_window[0].window_id}")`,
                         res
                     );
-                    
+
                     res.status(200).json(next_window_to_predict);
                 } catch (error) {
                     console.log("There is no new data available");
